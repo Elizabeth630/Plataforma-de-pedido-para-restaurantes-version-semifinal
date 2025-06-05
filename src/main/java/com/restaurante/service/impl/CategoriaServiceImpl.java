@@ -44,7 +44,7 @@ public class CategoriaServiceImpl implements ICategoriaService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     @Cacheable(value = "categoria", key = "#id")
     public CategoriaDTO obtenerPorId(Long id) {
         Categoria categoria = categoriaRepository.findById(id)
