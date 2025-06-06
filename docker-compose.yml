@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # PostgreSQL (ajustado para restaurante)
+  db:
+    image: postgres:15-alpine
+    container_name: postgres_restaurante
+    environment:
+      POSTGRES_DB: restaurante
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./sql/spring_session.sql:/docker-entrypoint-initdb.d/10-spring-session.sql  # Script de inicialización
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d restaurante"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  # Redis (nuevo servicio)
+  redis:
+    image: redis:7-alpine
+    container_name: redis_restaurante
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    restart: always
+
+  # Aplicación Spring Boot
+  app:
+    build: .
+    container_name: restaurante_app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/restaurante
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: 123456
+      
+      # Redis
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_CACHE_TYPE: redis
+      
+      # Spring Session (configuración segura)
+      SPRING_SESSION_STORE_TYPE: jdbc
+      SPRING_SESSION_JDBC_INITIALIZE_SCHEMA: never  # Las tablas se crearán por el script
+      
+      # JPA
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      
+      # Server
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    entrypoint: ["sh", "-c", "sleep 15 && java -jar app.jar"]
+
+volumes:
+  db_data:
+  redis_data:
